@@ -24,12 +24,31 @@ long_line_column=72
 
 [files]
 current_page=0
-FILE_NAME_0=142;Rust;0;EUTF-8;0;1;0;%2Fhome%2Fernst%2FProjekt%2Frustastar%2Fsrc%2Fmain.rs;0;4
+FILE_NAME_0=5080;Rust;0;EUTF-8;0;1;0;%2Fhome%2Fernst%2FProjekt%2Frustastar%2Fsrc%2Fmain.rs;0;4
+FILE_NAME_1=125;None;0;EUTF-8;0;1;0;%2Fhome%2Fernst%2FProjekt%2Frustastar%2FCargo.toml;0;4
+FILE_NAME_2=579;None;0;EUTF-8;0;1;0;%2Fhome%2Fernst%2FProjekt%2Frustastar%2FCargo.lock;0;4
 
 [VTE]
 last_dir=/home/ernst
 
+[editor]
+line_wrapping=false
+line_break_column=72
+auto_continue_multiline=true
+
 [build-menu]
-NF_00_LB=Run
-NF_00_CM=cargo run
-NF_00_WD=
+RustFT_00_LB=Kompilera
+RustFT_00_CM=cargo build
+RustFT_00_WD=
+RustFT_01_LB=Bygg
+RustFT_01_CM=cargo run
+RustFT_01_WD=
+filetypes=Rust;
+
+[prjorg]
+source_patterns=*.c;*.C;*.cpp;*.cxx;*.c++;*.cc;*.m;
+header_patterns=*.h;*.H;*.hpp;*.hxx;*.h++;*.hh;
+ignored_dirs_patterns=.*;CVS;
+ignored_file_patterns=*.o;*.obj;*.a;*.lib;*.so;*.dll;*.lo;*.la;*.class;*.jar;*.pyc;*.mo;*.gmo;
+generate_tag_prefs=0
+external_dirs=

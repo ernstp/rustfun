@@ -1,17 +1,21 @@
-use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
-use std::rc::Rc;
+use std::hash::{Hash, Hasher};
+//use std::thread::sleep_ms;
+
 extern crate rand;
 use rand::random;
 
-#[derive(Ord,Eq)]
+#[derive(Eq,Ord,Copy,Clone)]
 struct Point {
     x: u32,
     y: u32,
     path: u32,
     cost: u32,
-    parent: Option<Rc<Point>>,
+    index: u32,
+    parenti: Option<u32>,
 }
 
 impl Point {
@@ -19,29 +23,34 @@ impl Point {
         ((self.x as i32 - other.x as i32).abs() + (self.y as i32 - other.y as i32).abs()) as u32
     }
 
-    fn print_path(&self) {
-        match self.parent {
-            Some(ref x) => x.print_path(),
-            None => () };
-        println!("{},{}", self.x, self.y);
+    fn get_path(&self, points: &HashMap<u32, Point>) -> HashSet<u32> {
+        let mut path = HashSet::new();
+        let mut p = self;
+        loop {
+            path.insert(p.index);
+            match p.parenti {
+                Some(pi) => {
+                    match points.get(&pi) {
+                        Some(newp) => p = newp,
+                        None => break
+                    }
+                },
+                None => break
+            }
+        }
+        return path;
     }
+}
 
-    fn new(x: u32, y: u32, inparent: Option<&Rc<Point>>, target: &Point) -> Point {
-        let mut p = Point {x: x,
-               y: y,
-               path: 0,
-               cost: 0,
-               parent: None};
-        match inparent { Some(x) => { p.parent = Some(x.clone()); p.path = x.path + 1; },
-                         None => () };
-        p.cost = p.path + p.get_dist(target);
-        return p;
+impl Hash for Point {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
     }
 }
 
 impl PartialEq for Point {
     fn eq(&self, other: &Point) -> bool {
-        self.x == other.x && self.y == other.y
+        self.index == other.index
     }
 }
 
@@ -59,10 +68,16 @@ struct Map {
 }
 
 impl Map {
-    fn print(&self) {
+    fn print(&self, path: Option<&HashSet<u32>>) {
+        let mut index = 0;
         for row in self.data.iter() {
             for p in row.iter() {
-                print!("{}", p);
+                if path.is_some() && path.unwrap().contains(&index) {
+                    print!(". ");
+                } else {
+                    print!("{} ", p);
+                }
+                index += 1;
             }
             println!("");
         }
@@ -70,6 +85,21 @@ impl Map {
 
     fn index(&self, x: u32, y: u32) -> u32 {
         y * self.sizex + x
+    }
+
+    fn new_point(&self, x: u32, y: u32, inparent: Option<&Point>, target: Option<&Point>) -> Point {
+        let mut p = Point {x: x,
+               y: y,
+               path: 0,
+               cost: std::u32::MAX,
+               index: self.index(x, y),
+               parenti: None};
+        match inparent { Some(x) => { p.parenti = Some(x.index); p.path = x.path + 1; },
+                         None => () };
+        match target { Some(t) => { p.cost = p.path + p.get_dist(t); },
+                         None => () };
+        //println!(" - {}", p.index);
+        return p;
     }
 
     fn avail(&self, x: u32, y: u32) -> bool {
@@ -82,9 +112,9 @@ impl Map {
 
     fn new(sizex: u32, sizey: u32) -> Map {
         let mut d = Vec::with_capacity(sizey as usize);
-        for row in (0..sizey) {
+        for row in 0..sizey {
             let mut dr = Vec::with_capacity(sizex as usize);
-            for x in (0..sizex) {
+            for x in 0..sizex {
                 let r = rand::random::<u32>() % 3;
                 match r {
                     0 => dr.push(1),
@@ -97,56 +127,73 @@ impl Map {
     }
 }
 
-fn main() {
+fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
     let adjecent = vec![(1,1), (1,0), (1,-1), (0,-1), (-1,-1), (-1,0), (-1,1), (0,1)];
 
-    let map = Map::new(10, 3);
-    map.print();
-    let mut used = BTreeSet::new();
+    let mut open = HashSet::new();
+    let mut closed = HashMap::new();
     let mut openq = BinaryHeap::new();
-    let start = Point {x: 0, y: 0, path: 0, cost: 0, parent: None};
-    let target = Point {x: 9, y: 2, path: 0, cost: 0, parent: None};
-    used.insert(map.index(start.x, start.y));
 
-    let mut current = Rc::new(start);
-    let mut best = current.clone();
-    let mut best_dist = best.get_dist(&target);
+    let mut current = start.clone();
+    let mut best = start.clone();
+    let mut iterations = 0;
+    let max_iterations = (map.sizex + map.sizey) * 2;
 
-    while *current != target {
+    while current != target {
         for &(x, y) in adjecent.iter() {
-            let newx: i32 = current.x as i32 + x as i32;
-            let newy: i32 = current.y as i32 + y as i32;
+            let newx: i32 = current.x as i32 + x;
+            let newy: i32 = current.y as i32 + y;
             if newy >= 0 && newx >= 0 && newx < map.sizex as i32 && newy < map.sizey as i32 {
                 let newx: u32 = newx as u32;
                 let newy: u32 = newy as u32;
-                let index = map.index(newx, newy);
-                // TODO: If the point exists in the openq and this is a shorter
-                // path to this point it should be updated.
-                if !used.contains(&index) && map.avail(newx, newy) {
-                    let p = Point::new(newx,
-                                       newy,
-                                       Some(&current),
-                                       &target);
-                    used.insert(index);
-                    openq.push(Rc::new(p));
+                let index: u32 = map.index(newx, newy);
+                
+                if !open.contains(&index) && !closed.contains_key(&index) && map.avail(newx, newy) {
+                    let p = map.new_point(newx,
+                                      newy,
+                                      Some(&current),
+                                      Some(&target));
+                    openq.push(p);
+                    open.insert(index);
                 }
             }
         }
         match openq.pop() {
-            Some(v) => { current = v; }
+            Some(v) => {
+                closed.insert(current.index, current);
+                current = v;},
             None => break
         }
-        let current_dist = current.get_dist(&target);
-        if current_dist < best_dist || (best_dist == current_dist && current.path < best.path) {
+
+        if current.get_dist(&target) < best.get_dist(&target) {
             best = current.clone();
-            best_dist = best.get_dist(&target);
+        }
+
+        iterations += 1;
+        if iterations > max_iterations {
+            break;
         }
     }
-    if *current != target {
-        best.print_path();
-        println!("FAIL!   {}", best.path);
+
+    if current == target {
+        return current.get_path(&closed);
     } else {
-        current.print_path();
-        println!("length: {}", current.path);
+        return best.get_path(&closed)
+    }
+}
+
+fn main() {
+    let map = Map::new(100, 100);
+
+    let start = map.new_point(0, 0, None, None);
+    let target = map.new_point(99, 99, None, None);
+
+    let path = find_path(&map, start, target);
+
+    map.print(Some(&path));
+    if path.contains(&map.index(target.x, target.y)) {
+        println!("OK");
+    } else {
+        println!("FAIL");
     }
 }
