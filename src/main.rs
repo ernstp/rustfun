@@ -64,24 +64,22 @@ impl PartialOrd for Point {
 }
 
 struct Map {
-    data: Vec<Vec<u32>>,
+    data: Vec<u32>,
     sizex: u32,
     sizey: u32,
 }
 
 impl Map {
     fn print(&self, path: Option<&HashSet<u32>>) {
-        let mut index = 0;
-        for row in self.data.iter() {
-            for p in row.iter() {
-                if path.is_some() && path.unwrap().contains(&index) {
-                    print!(". ");
-                } else {
-                    print!("{} ", p);
-                }
-                index += 1;
+        for (index, d) in self.data.iter().enumerate() {
+            if path.is_some() && path.unwrap().contains(&(index as u32)) {
+                print!(". ");
+            } else {
+                print!("{} ", d);
             }
-            println!("");
+            if (index as u32 + self.sizex + 1) % self.sizex == 0 {
+                println!(""); // New line
+            }
         }
     }
 
@@ -100,33 +98,29 @@ impl Map {
                          None => () };
         match target { Some(t) => { p.cost = p.path + p.get_dist(t); },
                          None => () };
-        //println!(" - {}", p.index);
         return p;
     }
 
-    fn avail(&self, x: u32, y: u32) -> bool {
-        if x <= self.sizex && y <= self.sizey {
-            self.data[y as usize][x as usize] == 0
-        } else {
-            false
-        }
+    fn avail(&self, index: &u32) -> bool {
+        self.data[(*index) as usize] == 0
+    }
+
+    fn in_map(&self, x: &i32, y: &i32) -> bool {
+        *y >= 0 && *x >= 0 && *x < self.sizex as i32 && *y < self.sizey as i32
     }
 
     fn new(sizex: u32, sizey: u32, seed: usize) -> Map {
-        let mut d = Vec::with_capacity(sizey as usize);
+        let size: usize = (sizex * sizey) as usize;
+        let mut d = Vec::with_capacity(size);
         let seed: &[_] = &[seed];
         let mut rng: StdRng = SeedableRng::from_seed(seed);
 
-        for row in 0..sizey {
-            let mut dr = Vec::with_capacity(sizex as usize);
-            for x in 0..sizex {
-                let r = rng.gen::<u32>() % 3;
-                match r {
-                    0 => dr.push(1),
-                    _ => dr.push(0),
-                }
+        for i in 0..size {
+            let r = rng.gen::<u32>() % 3;
+            match r {
+                0 => d.push(1),
+                _ => d.push(0),
             }
-            d.push(dr);
         };
         Map {data: d, sizex: sizex, sizey: sizey }
     }
@@ -141,6 +135,7 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
 
     let mut current = start.clone();
     let mut best = start.clone();
+    let mut best_dist = std::u32::MAX;
     let mut iterations = 0;
     let max_iterations = (map.sizex + map.sizey) * 2;
 
@@ -148,12 +143,12 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
         for &(x, y) in adjecent.iter() {
             let newx: i32 = current.x as i32 + x;
             let newy: i32 = current.y as i32 + y;
-            if newy >= 0 && newx >= 0 && newx < map.sizex as i32 && newy < map.sizey as i32 {
+            if map.in_map(&newx, &newy) {
                 let newx: u32 = newx as u32;
                 let newy: u32 = newy as u32;
                 let index: u32 = map.index(newx, newy);
                 
-                if map.avail(newx, newy) && !closed.contains_key(&index) && !open.contains(&index) {
+                if map.avail(&index) && !closed.contains_key(&index) && !open.contains(&index) {
                     let p = map.new_point(newx,
                                       newy,
                                       Some(&current),
@@ -172,8 +167,10 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
             None => break
         }
 
-        if current.get_dist(&target) < best.get_dist(&target) {
+        let curr_dist = current.get_dist(&target);
+        if curr_dist < best_dist {
             best = current.clone();
+            best_dist = curr_dist;
         }
 
         iterations += 1;
