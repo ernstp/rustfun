@@ -153,7 +153,7 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
                 let newy: u32 = newy as u32;
                 let index: u32 = map.index(newx, newy);
                 
-                if !open.contains(&index) && !closed.contains_key(&index) && map.avail(newx, newy) {
+                if map.avail(newx, newy) && !closed.contains_key(&index) && !open.contains(&index) {
                     let p = map.new_point(newx,
                                       newy,
                                       Some(&current),
@@ -165,6 +165,8 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
         }
         match openq.pop() {
             Some(v) => {
+                // This is the "right thing" to do but it's actually faster to avoid
+                // open.remove(&v.index);
                 closed.insert(current.index, current);
                 current = v;},
             None => break
