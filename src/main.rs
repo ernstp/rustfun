@@ -6,7 +6,9 @@ use std::hash::{Hash, Hasher};
 //use std::thread::sleep_ms;
 
 extern crate rand;
-use rand::random;
+extern crate time;
+use rand::{Rng, SeedableRng, StdRng};
+use time::precise_time_ns;
 
 #[derive(Eq,Ord,Copy,Clone)]
 struct Point {
@@ -110,12 +112,15 @@ impl Map {
         }
     }
 
-    fn new(sizex: u32, sizey: u32) -> Map {
+    fn new(sizex: u32, sizey: u32, seed: usize) -> Map {
         let mut d = Vec::with_capacity(sizey as usize);
+        let seed: &[_] = &[seed];
+        let mut rng: StdRng = SeedableRng::from_seed(seed);
+
         for row in 0..sizey {
             let mut dr = Vec::with_capacity(sizex as usize);
             for x in 0..sizex {
-                let r = rand::random::<u32>() % 3;
+                let r = rng.gen::<u32>() % 3;
                 match r {
                     0 => dr.push(1),
                     _ => dr.push(0),
@@ -183,12 +188,18 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
 }
 
 fn main() {
-    let map = Map::new(100, 100);
+    let map = Map::new(100, 100, 89);
 
     let start = map.new_point(0, 0, None, None);
     let target = map.new_point(99, 99, None, None);
 
-    let path = find_path(&map, start, target);
+    let mut path = HashSet::new();
+
+    let mut time = precise_time_ns();
+    for i in 0..1000 {
+        path = find_path(&map, start, target);
+    }
+    time = precise_time_ns() - time;
 
     map.print(Some(&path));
     if path.contains(&map.index(target.x, target.y)) {
@@ -196,4 +207,5 @@ fn main() {
     } else {
         println!("FAIL");
     }
+    println!("{}", time / 1000000);
 }
