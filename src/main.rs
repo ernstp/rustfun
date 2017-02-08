@@ -116,7 +116,7 @@ impl Map {
         let seed: &[_] = &[seed];
         let mut rng: StdRng = SeedableRng::from_seed(seed);
 
-        for i in 0..size {
+        for _ in 0..size {
             let r = rng.gen::<u32>() % 3;
             match r {
                 0 => d.push(1),
@@ -196,7 +196,7 @@ fn main() {
     let mut path = HashSet::new();
 
     let time = Instant::now();
-    for i in 0..1000 {
+    for _ in 0..1000 {
         path = find_path(&map, start, target);
     }
     let dur = Instant::now() - time;
