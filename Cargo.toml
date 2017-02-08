@@ -3,5 +3,9 @@ name = "rustastar"
 version = "0.0.1"
 authors = ["Ernst Sjöstrand <ernstp@gmail.com>"]
 
+[profile.release]
+lto = true
+panic = 'abort'
+
 [dependencies]
 rand = "*"
