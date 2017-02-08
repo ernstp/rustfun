@@ -69,11 +69,14 @@ struct Map {
 
 impl Map {
     fn print(&self, path: Option<&HashSet<u32>>) {
+        println!("--------");
         for (index, d) in self.data.iter().enumerate() {
             if path.is_some() && path.unwrap().contains(&(index as u32)) {
                 print!(". ");
+            } else if *d == 1 {
+                print!("X ");
             } else {
-                print!("{} ", d);
+                print!("  ");
             }
             if (index as u32 + self.sizex + 1) % self.sizex == 0 {
                 println!(""); // New line
