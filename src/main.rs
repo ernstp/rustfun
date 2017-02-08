@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::time::Instant;
+use std::thread::sleep;
+use std::time::{Duration,Instant};
 
 extern crate rand;
 use rand::{Rng, SeedableRng, StdRng};
@@ -127,7 +128,7 @@ impl Map {
     }
 }
 
-fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
+fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u32> {
     let adjecent = vec![(1,1), (1,0), (1,-1), (0,-1), (-1,-1), (-1,0), (-1,1), (0,1)];
 
     let mut open = HashSet::new();
@@ -178,6 +179,10 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
         if iterations > max_iterations {
             break;
         }
+        if visual {
+            map.print(Some(&current.get_path(&closed)));
+            sleep(Duration::from_millis(100));
+        }
     }
 
     if current == target {
@@ -188,6 +193,7 @@ fn find_path(map: &Map, start: Point, target: Point) -> HashSet<u32> {
 }
 
 fn main() {
+    let visual = false;
     let map = Map::new(100, 100, 89);
 
     let start = map.new_point(0, 0, None, None);
@@ -195,9 +201,14 @@ fn main() {
 
     let mut path = HashSet::new();
 
+    let iterations = match visual {
+        true => 1,
+        false => 10000,
+    };
+
     let time = Instant::now();
-    for _ in 0..1000 {
-        path = find_path(&map, start, target);
+    for _ in 0..iterations {
+        path = find_path(&map, start, target, visual);
     }
     let dur = Instant::now() - time;
 
@@ -207,5 +218,5 @@ fn main() {
     } else {
         println!("FAIL");
     }
-    println!("{}", (dur.as_secs() * 1_000_000 + dur.subsec_nanos() as u64 / 1000) / 1000);
+    println!("{}", (dur.as_secs() * 1_000_000 + dur.subsec_nanos() as u64 / 1000) / iterations);
 }
