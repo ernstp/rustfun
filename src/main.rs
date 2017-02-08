@@ -3,12 +3,10 @@ use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-//use std::thread::sleep_ms;
+use std::time::Instant;
 
 extern crate rand;
-extern crate time;
 use rand::{Rng, SeedableRng, StdRng};
-use time::precise_time_ns;
 
 #[derive(Eq,Ord,Copy,Clone)]
 struct Point {
@@ -194,11 +192,11 @@ fn main() {
 
     let mut path = HashSet::new();
 
-    let mut time = precise_time_ns();
+    let time = Instant::now();
     for i in 0..1000 {
         path = find_path(&map, start, target);
     }
-    time = precise_time_ns() - time;
+    let dur = Instant::now() - time;
 
     map.print(Some(&path));
     if path.contains(&map.index(target.x, target.y)) {
@@ -206,5 +204,5 @@ fn main() {
     } else {
         println!("FAIL");
     }
-    println!("{}", time / 1000000);
+    println!("{}", (dur.as_secs() * 1_000_000 + dur.subsec_nanos() as u64 / 1000) / 1000);
 }
