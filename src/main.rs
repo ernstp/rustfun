@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::BinaryHeap;
+use std::collections::BTreeSet;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::thread::sleep;
@@ -10,13 +10,13 @@ use std::cmp;
 extern crate rand;
 use rand::{Rng, SeedableRng, StdRng};
 
-#[derive(Eq,Ord,Copy,Clone)]
+#[derive(Eq,Copy,Clone)]
 struct Point {
+    cost: u32,
+    path: u32,
+    index: u32,
     x: u32,
     y: u32,
-    path: u32,
-    cost: u32,
-    index: u32,
     parenti: Option<u32>,
 }
 
@@ -60,13 +60,26 @@ impl PartialEq for Point {
     }
 }
 
+impl Ord for Point {
+    fn cmp(&self, other: &Point) -> Ordering {
+        if self.cost == other.cost {
+            if self.path == other.path {
+                self.index.cmp(&other.index)
+            } else {
+                self.path.cmp(&other.path)
+            }
+        } else {
+            self.cost.cmp(&other.cost)
+        }
+    }
+}
+
 impl PartialOrd for Point {
     fn partial_cmp(&self, other: &Point) -> Option<Ordering> {
-        // Order by reversed cost
         if self.cost == other.cost {
-            other.path.partial_cmp(&self.path)
+            self.path.partial_cmp(&other.path)
         } else {
-            other.cost.partial_cmp(&self.cost)
+            self.cost.partial_cmp(&other.cost)
         }
     }
 }
@@ -140,9 +153,10 @@ impl Map {
 fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u32> {
     let adjecent = vec![(1,1), (1,0), (1,-1), (0,-1), (-1,-1), (-1,0), (-1,1), (0,1)];
 
-    let mut open = HashSet::new();
+    // These two should always be updated in parallel
+    let mut open = HashMap::new(); // Based on position
+    let mut openq = BTreeSet::new(); // Based on cost
     let mut closed = HashMap::new();
-    let mut openq = BinaryHeap::new();
 
     let mut current = start.clone();
     let mut best = start.clone();
@@ -159,23 +173,24 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
                 let newy: u32 = newy as u32;
                 let index: u32 = map.index(newx, newy);
                 
-                if map.avail(&index) && !closed.contains_key(&index) && !open.contains(&index) {
+                if map.avail(&index) && !closed.contains_key(&index) && !open.contains_key(&index) {
                     let p = map.new_point(newx,
                                       newy,
                                       Some(&current),
                                       Some(&target));
-                    openq.push(p);
-                    open.insert(index);
+                    openq.insert(p);
+                    open.insert(index, 0);
                 }
             }
         }
-        match openq.pop() {
-            Some(v) => {
-                open.remove(&v.index);
-                closed.insert(current.index, current);
-                current = v;},
+
+        closed.insert(current.index, current);
+        match openq.iter().next() {
+            Some(v) => { current = *v; },
             None => break
         }
+        open.remove(&current.index);
+        openq.remove(&current);
 
         let curr_dist = current.get_dist(&target);
         if curr_dist < best_dist {
