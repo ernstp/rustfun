@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::thread::sleep;
 use std::time::{Duration,Instant};
+use std::cmp;
 
 extern crate rand;
 use rand::{Rng, SeedableRng, StdRng};
@@ -21,7 +22,11 @@ struct Point {
 
 impl Point {
     fn get_dist(&self, other: &Point) -> u32 {
-        ((self.x as i32 - other.x as i32).abs() + (self.y as i32 - other.y as i32).abs()) as u32
+        let xd = (self.x as i32 - other.x as i32).abs();
+        let yd = (self.y as i32 - other.y as i32).abs();
+        let diagonal = cmp::min(xd, yd) as u32 * 10;
+        let straight = (xd - yd).abs() as u32 * 7;
+        diagonal + straight
     }
 
     fn get_path(&self, points: &HashMap<u32, Point>) -> HashSet<u32> {
@@ -58,7 +63,11 @@ impl PartialEq for Point {
 impl PartialOrd for Point {
     fn partial_cmp(&self, other: &Point) -> Option<Ordering> {
         // Order by reversed cost
-        other.cost.partial_cmp(&self.cost)
+        if self.cost == other.cost {
+            other.path.partial_cmp(&self.path)
+        } else {
+            other.cost.partial_cmp(&self.cost)
+        }
     }
 }
 
@@ -96,7 +105,7 @@ impl Map {
                cost: std::u32::MAX,
                index: self.index(x, y),
                parenti: None};
-        match inparent { Some(x) => { p.parenti = Some(x.index); p.path = x.path + 1; },
+        match inparent { Some(x) => { p.parenti = Some(x.index); p.path = x.path + p.get_dist(x); },
                          None => () };
         match target { Some(t) => { p.cost = p.path + p.get_dist(t); },
                          None => () };
@@ -139,7 +148,7 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
     let mut best = start.clone();
     let mut best_dist = std::u32::MAX;
     let mut iterations = 0;
-    let max_iterations = (map.sizex + map.sizey) * 2;
+    let max_iterations = (map.sizex + map.sizey) * 10;
 
     while current != target {
         for &(x, y) in adjecent.iter() {
@@ -214,7 +223,7 @@ fn main() {
 
     map.print(Some(&path));
     if path.contains(&map.index(target.x, target.y)) {
-        println!("OK");
+        println!("OK len: {}", path.len());
     } else {
         println!("FAIL");
     }
