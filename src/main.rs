@@ -194,7 +194,7 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
 
 fn main() {
     let visual = false;
-    let map = Map::new(100, 100, 89);
+    let map = Map::new(100, 100, 1867);
 
     let start = map.new_point(0, 0, None, None);
     let target = map.new_point(99, 99, None, None);
