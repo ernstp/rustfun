@@ -171,8 +171,7 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
         }
         match openq.pop() {
             Some(v) => {
-                // This is the "right thing" to do but it's actually faster to avoid
-                // open.remove(&v.index);
+                open.remove(&v.index);
                 closed.insert(current.index, current);
                 current = v;},
             None => break
