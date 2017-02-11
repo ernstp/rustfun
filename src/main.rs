@@ -173,13 +173,27 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
                 let newy: u32 = newy as u32;
                 let index: u32 = map.index(newx, newy);
                 
-                if map.avail(&index) && !closed.contains_key(&index) && !open.contains_key(&index) {
+                if map.avail(&index) && !closed.contains_key(&index) {
                     let p = map.new_point(newx,
                                       newy,
                                       Some(&current),
                                       Some(&target));
-                    openq.insert(p);
-                    open.insert(index, 0);
+
+                    let mut do_insert = false;
+                    if let Some(&old_p) = open.get(&index) {
+                        let old_p: Point = old_p;
+                        if old_p.path > p.path {
+                            openq.remove(&old_p);
+                            open.remove(&index);
+                            do_insert = true;
+                        }
+                    } else {
+                        do_insert = true;
+                    }
+                    if do_insert {
+                        openq.insert(p);
+                        open.insert(index, p);
+                    }
                 }
             }
         }
