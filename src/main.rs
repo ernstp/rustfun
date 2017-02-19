@@ -14,18 +14,37 @@ use rand::{Rng, SeedableRng, StdRng};
 struct Point {
     cost: u32,
     path: u32,
+    remain: u32,
     index: u32,
     x: u32,
     y: u32,
     parenti: Option<u32>,
 }
 
+// When predicting the distance to the target, add some extra cost
+// for there will surely be a few obstacles in the way. Otherwise
+// the algorithm is too optimistic about trying alternative paths
+// and becomes very slow.
+const OBSTACLE_FACTOR: u32 = 10;
+// It looks silly when the path zig-zags instead of taking straight
+// lines, make diagonal moves a tiny bit more expensive.
+const DIAGONAL_COST: u32 = 100;
+const STRAIGHT_COST: u32 = 99;
+const ADJECENT: [(i32, i32, u32); 8] = [(1,1,DIAGONAL_COST),
+                                        (1,0,STRAIGHT_COST),
+                                        (1,-1,DIAGONAL_COST),
+                                        (0,-1,STRAIGHT_COST),
+                                        (-1,-1,DIAGONAL_COST),
+                                        (-1,0,STRAIGHT_COST),
+                                        (-1,1,DIAGONAL_COST),
+                                        (0,1,STRAIGHT_COST)];
+
 impl Point {
-    fn get_dist(&self, other: &Point) -> u32 {
-        let xd = (self.x as i32 - other.x as i32).abs();
-        let yd = (self.y as i32 - other.y as i32).abs();
-        let diagonal = cmp::min(xd, yd) as u32 * 10;
-        let straight = (xd - yd).abs() as u32 * 7;
+    fn get_dist(&self, x: u32, y: u32) -> u32 {
+        let xd = (self.x as i32 - x as i32).abs();
+        let yd = (self.y as i32 - y as i32).abs();
+        let diagonal = cmp::min(xd, yd) as u32 * (DIAGONAL_COST + OBSTACLE_FACTOR);
+        let straight = (xd - yd).abs() as u32 * (STRAIGHT_COST + OBSTACLE_FACTOR);
         diagonal + straight
     }
 
@@ -111,18 +130,24 @@ impl Map {
         y * self.sizex + x
     }
 
-    fn new_point(&self, x: u32, y: u32, inparent: Option<&Point>, target: Option<&Point>) -> Point {
-        let mut p = Point {x: x,
+    fn new_point(&self, x: u32, y: u32, inparent: &Point, remain: u32, path: u32) -> Point {
+        Point {x: x,
+               y: y,
+               path: path,
+               cost: path + remain,
+               remain: remain,
+               index: self.index(x, y),
+               parenti: Some(inparent.index)}
+    }
+
+    fn new_point_simple(&self, x: u32, y: u32) -> Point {
+        Point {x: x,
                y: y,
                path: 0,
                cost: std::u32::MAX,
+               remain: 0,
                index: self.index(x, y),
-               parenti: None};
-        match inparent { Some(x) => { p.parenti = Some(x.index); p.path = x.path + p.get_dist(x); },
-                         None => () };
-        match target { Some(t) => { p.cost = p.path + p.get_dist(t); },
-                         None => () };
-        return p;
+               parenti: None}
     }
 
     fn avail(&self, index: &u32) -> bool {
@@ -151,21 +176,19 @@ impl Map {
 }
 
 fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u32> {
-    let adjecent = vec![(1,1), (1,0), (1,-1), (0,-1), (-1,-1), (-1,0), (-1,1), (0,1)];
 
     // These two should always be updated in parallel
-    let mut open = HashMap::new(); // Based on position
+    let mut open = HashMap::<u32, Point>::new(); // Based on position
     let mut openq = BTreeSet::new(); // Based on cost
     let mut closed = HashMap::new();
 
-    let mut current = start.clone();
-    let mut best = start.clone();
-    let mut best_dist = std::u32::MAX;
+    let mut current = start;
+    let mut best = start;
     let mut iterations = 0;
     let max_iterations = (map.sizex + map.sizey) * 10;
 
     while current != target {
-        for &(x, y) in adjecent.iter() {
+        for &(x, y, dist) in ADJECENT.iter() {
             let newx: i32 = current.x as i32 + x;
             let newy: i32 = current.y as i32 + y;
             if map.in_map(&newx, &newy) {
@@ -174,23 +197,23 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
                 let index: u32 = map.index(newx, newy);
                 
                 if map.avail(&index) && !closed.contains_key(&index) {
-                    let p = map.new_point(newx,
-                                      newy,
-                                      Some(&current),
-                                      Some(&target));
+                    let temp_path = current.path + dist;
 
-                    let mut do_insert = false;
+                    let mut do_insert = true;
                     if let Some(&old_p) = open.get(&index) {
-                        let old_p: Point = old_p;
-                        if old_p.path > p.path {
+                        if old_p.path > temp_path {
                             openq.remove(&old_p);
                             open.remove(&index);
-                            do_insert = true;
+                        } else {
+                            do_insert = false;
                         }
-                    } else {
-                        do_insert = true;
                     }
                     if do_insert {
+                        let p = map.new_point(newx,
+                                              newy,
+                                              &current,
+                                              target.get_dist(newx, newy),
+                                              temp_path);
                         openq.insert(p);
                         open.insert(index, p);
                     }
@@ -206,10 +229,8 @@ fn find_path(map: &Map, start: Point, target: Point, visual: bool) -> HashSet<u3
         open.remove(&current.index);
         openq.remove(&current);
 
-        let curr_dist = current.get_dist(&target);
-        if curr_dist < best_dist {
-            best = current.clone();
-            best_dist = curr_dist;
+        if current.remain < best.remain {
+            best = current;
         }
 
         iterations += 1;
@@ -233,8 +254,8 @@ fn main() {
     let visual = false;
     let map = Map::new(100, 100, 1867);
 
-    let start = map.new_point(0, 0, None, None);
-    let target = map.new_point(99, 99, None, None);
+    let start = map.new_point_simple(0, 0);
+    let target = map.new_point_simple(99, 99);
 
     let mut path = HashSet::new();
 
